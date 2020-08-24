@@ -12,26 +12,24 @@ const qs = require("qs");
  * @returns {string} Refresh Token
  */
 async function getRefreshToken(host, userLogin, password, clientId, secret) {
-  return await axios({
-    method: "post",
-    url: `${host}/login`,
-    data: {
-      user: userLogin,
-      password,
-    },
-    headers: {
-      "Content-Type": "application/json",
-      authorization:
-        "Basic " + Buffer.from(clientId + ":" + secret).toString("base64"),
-    },
-  })
-    .then(function (response) {
-      return response.data.refresh_token;
-    })
-    .catch(function (error) {
-      // handle error
-      console.log(error);
+  try {
+    const response = await axios({
+      method: "post",
+      url: `${host}/login`,
+      data: {
+        user: userLogin,
+        password,
+      },
+      headers: {
+        "Content-Type": "application/json",
+        authorization:
+          "Basic " + Buffer.from(clientId + ":" + secret).toString("base64"),
+      },
     });
+    return response.data.refresh_token;
+  } catch (e) {
+    // handle error
+  }
 }
 
 /**
@@ -46,21 +44,19 @@ async function getAccessToken(host, refresh_token) {
     refresh_token: refresh_token,
   });
 
-  return axios({
-    method: "post",
-    url: `${host}/token`,
-    data,
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-  })
-    .then(function (response) {
-      return response.data.access_token;
-    })
-    .catch(function (error) {
-      // handle error
-      console.log(error);
+  try {
+    const response = await axios({
+      method: "post",
+      url: `${host}/token`,
+      data,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
     });
+    return response.data.access_token;
+  } catch (e) {
+    // handle error
+  }
 }
 
 /**
@@ -70,21 +66,36 @@ async function getAccessToken(host, refresh_token) {
  * @returns {Array} List of accounts
  */
 async function getAccounts(host, access_token) {
-  return axios({
-    method: "get",
-    url: `${host}/accounts`,
-    headers: {
-      "Content-Type": "application/json",
-      authorization: `Bearer ${access_token}`,
-    },
-  })
-    .then(function (response) {
-      return response.data.account;
-    })
-    .catch(function (error) {
-      // handle error
-      console.log(error);
-    });
+  let accounts = [];
+  let nextPage = true;
+  let page = 1;
+
+  try {
+    while (nextPage) {
+      let response = await axios({
+        method: "get",
+        url: `${host}/accounts`,
+        params: {
+          page,
+        },
+        headers: {
+          "Content-Type": "application/json",
+          authorization: `Bearer ${access_token}`,
+        },
+      });
+
+      page += 1;
+      accounts = accounts.concat(response.data.account);
+
+      if (!response.data.link || !response.data.link.next) {
+        nextPage = false;
+      }
+    }
+  } catch (e) {
+    // handle fetch error
+  }
+
+  return accounts;
 }
 
 /**
@@ -96,21 +107,35 @@ async function getAccounts(host, access_token) {
  * @returns {Object} Transaction
  */
 async function getTransactions(host, account, access_token) {
-  return axios({
-    method: "get",
-    url: `${host}/accounts/${account.acc_number}/transactions`,
-    headers: {
-      "Content-Type": "application/json",
-      authorization: `Bearer ${access_token}`,
-    },
-  })
-    .then(function (response) {
-      return response.data.transactions;
-    })
-    .catch(function (error) {
-      // handle error
-      console.log(error);
-    });
+  let transactions = [];
+  let nextPage = true;
+  let page = 1;
+
+  try {
+    while (nextPage) {
+      let response = await axios({
+        method: "get",
+        url: `${host}/accounts/${account.acc_number}/transactions`,
+        params: {
+          page,
+        },
+        headers: {
+          "Content-Type": "application/json",
+          authorization: `Bearer ${access_token}`,
+        },
+      });
+
+      transactions = transactions.concat(response.data.transactions);
+      page += 1;
+
+      if (!response.data.link || !response.data.link.next) {
+        nextPage = false;
+      }
+    }
+  } catch (e) {
+    // handle fetch error
+  }
+  return transactions;
 }
 
 exports.getRefreshToken = getRefreshToken;
